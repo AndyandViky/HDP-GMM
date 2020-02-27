@@ -62,7 +62,7 @@ class VIModel:
 
     def _bound_x(self, X):
         N, D = X.shape
-        bound_x = np.empty((self.K, N))
+        bound_x = np.empty((self.newJ, N))
         for t in range(self.newJ):
             bound_x[t] = np.sum((X - self.mean_mu[t])**2, axis = 1) + np.trace(self.cov_mu[t])
         return bound_x
@@ -72,7 +72,7 @@ class VIModel:
         self.J = len(data)
         self.D = data[0].shape[1]
 
-        total_data = np.vstack((i for i in data))
+        # total_data = np.vstack((i for i in data))
         # self.mean_mu = KMeans(n_clusters=self.K).fit(total_data).cluster_centers_[::-1]
         self.mean_mu = np.zeros((self.K, self.D))
         self.cov_mu = np.empty((self.K, self.D, self.D))
@@ -131,6 +131,8 @@ class VIModel:
         self.pi = self.pi[self.pi > threshold]
         self.newJ = self.pi.size
 
+        self.a_tao = self.a_tao[index]
+        self.b_tao = self.b_tao[index]
         self.mean_mu = self.mean_mu[index]
         self.cov_mu = self.cov_mu[index]
 
@@ -232,12 +234,12 @@ class VIModel:
             self.update_mu()
             self.update_tao(x)
 
-            print(ite)
+            # print(ite)
 
             if ite == self.args.max_iter - 1:
                 # compute k
                 self.pi = np.exp(self.expect_log_sticks(self.a, self.b, self.K))
-                # self.calculate_new_com()
+                self.calculate_new_com()
                 if self.args.verbose:
                     print('mu: {}'.format(self.mean_mu))
                     # print('con: {}'.format(self.con))
@@ -245,7 +247,7 @@ class VIModel:
 
     def _log_lik_x(self, bound_X):
         likx = np.zeros(bound_X.shape)
-        for t in range(self.K):
+        for t in range(self.newJ):
             likx[t, :] = .5*self.D*(digamma(self.a_tao[t]) - np.log(self.b_tao[t]) - np.log(2*np.pi))
             tao_t = self.a_tao[t] / self.b_tao[t]
             likx[t, :] -= .5 * tao_t * bound_X[t]
@@ -286,7 +288,7 @@ class VIModel:
         # predict
         data = np.vstack((i for i in data))
         bound_X = self._bound_x(data)
-        likc = self.expect_log_sticks(self.a, self.b, self.K)
+        likc = np.log(self.pi)
         likx = self._log_lik_x(bound_X)
         s = likc[:, np.newaxis] + likx
         rho = np.exp(log_normalize(s.T)[0])

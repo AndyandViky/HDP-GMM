@@ -47,9 +47,9 @@ if __name__ == "__main__":
                                     description='Hierarchical Dirichlet process Mixture Models of datas Distributions')
     parser.add_argument('-c', '--algorithm_category', dest='algorithm_category', help='choose VIModel:0 or SVIModel:1',
                         default=0)
-    parser.add_argument('-name', '--data_name', dest='data_name', help='data_name', default='big_data')
+    parser.add_argument('-name', '--data_name', dest='data_name', help='data_name', default='Sporulation')
     parser.add_argument('-lp', '--load_params', dest='load_params', help='load_params', default=1)
-    parser.add_argument('-verbose', '--verbose', dest='verbose', help='verbose', default=1)
+    parser.add_argument('-verbose', '--verbose', dest='verbose', help='verbose', default=0)
     # hyper parameters
     parser.add_argument('-k', '--K', dest='K', help='truncation level K', default=6)
     parser.add_argument('-t', '--T', dest='T', help='truncation level T', default=50)
@@ -61,58 +61,40 @@ if __name__ == "__main__":
     parser.add_argument('-th', '--threshold', dest='threshold', help='second threshold', default=1e-7)
     parser.add_argument('-mth', '--mix_threshold', dest='mix_threshold', help='mix_threshold', default=0.01)
     parser.add_argument('-sm', '--second_max_iter', dest='second_max_iter',
-                        help='second max iteration of variational inference', default=-1)
+                        help='second max iteration of variational inference', default=500)
     parser.add_argument('-m', '--max_iter', dest='max_iter', help='max iteration of variational inference', default=30)
     args = parser.parse_args()
 
-    data, _, time_ser = get_data(DATASETS_DIR, args.data_name)
+    _, data, time_ser = get_data(DATASETS_DIR, args.data_name)
     print('begin training......')
     print('========================dataset is {}========================'.format(args.data_name))
 
-    data = scio.loadmat("{}/{}.mat".format(DATASETS_DIR, args.data_name))
-    labels = data['z'].reshape(-1)
-    data = data['data']
-    #
-    # test = data.reshape((-1, 5))
-    # vd = VDPGMM(T=6)
-    # vd.fit(test)
-    # pred = vd.predict(test)
-    # category = np.unique(np.array(pred))
-    # print(category)
-    # console_log(pred, data=test, labels=labels, model_name='============dp-gmm', each_data=[test[pred == i] for i in category],
-    #             mu=vd.mean_mu[category])
+    K, T, mix_threshold, algorithm_category, max_iter, second_max_iter, threshold, group, dim, time = DATA_PARAMS[
+        args.data_name]
 
-    # K, T, mix_threshold, algorithm_category, max_iter, second_max_iter, threshold, group, dim, time = DATA_PARAMS[
-    #     args.data_name]
-    #
-    # if int(args.load_params) == 1:
-    #     args.K = K
-    #     args.T = T
-    #     args.mix_threshold = mix_threshold
-    #     args.algorithm_category = algorithm_category
-    #     args.second_max_iter = second_max_iter
-    #     args.threshold = threshold
-    #
-    args.max_iter = 200
-    # index = int(data.shape[0] / group)
-    # datas = list()
-    # for i in range(group):
-    #     if i != group - 1:
-    #         datas.append(data[i * index:(i + 1) * index])
-    #     else:
-    #         datas.append(data[i * index:])
-        # _labels[i] = labels[ra]
+    if int(args.load_params) == 1:
+        args.K = K
+        args.T = T
+        args.mix_threshold = mix_threshold
+        args.algorithm_category = algorithm_category
+        args.second_max_iter = second_max_iter
+        args.threshold = threshold
+
+    args.max_iter = max_iter
+    index = int(data.shape[0] / group)
+    datas = list()
+    for i in range(group):
+        if i != group - 1:
+            datas.append(data[i * index:(i + 1) * index])
+        else:
+            datas.append(data[i * index:])
     trainer = Trainer(args)
-    trainer.train(data)
+    trainer.train(datas)
     pred = trainer.model.predict(data)
     category = np.unique(np.array(pred))
-    print(pred[800:1200])
-    print(category)
-    data = data.reshape((-1, 5))
     console_log(pred, data=data, model_name='===========hdp-gmm', each_data=[data[pred == i] for i in category],
                 mu=trainer.model.mean_mu[category], newJ=trainer.model.newJ)
 
-    # plot_data([time_ser[pred == i] for i in category], time, data_name=args.data_name, save=True)
 
 
 
