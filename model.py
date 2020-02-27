@@ -14,7 +14,8 @@ try:
     from sklearn.cluster import KMeans
     from numpy.matlib import repmat
 
-    from utils import log_normalize
+    from utils import log_normalize, get_data, console_log
+    from config import DATASETS_DIR
 except ImportError as e:
     print(e)
     raise ImportError
@@ -72,7 +73,8 @@ class VIModel:
         self.D = data[0].shape[1]
 
         total_data = np.vstack((i for i in data))
-        self.mean_mu = KMeans(n_clusters=self.K).fit(total_data).cluster_centers_[::-1]
+        # self.mean_mu = KMeans(n_clusters=self.K).fit(total_data).cluster_centers_[::-1]
+        self.mean_mu = np.zeros((self.K, self.D))
         self.cov_mu = np.empty((self.K, self.D, self.D))
         for i in range(self.K):
             self.cov_mu[i] = np.eye(self.D)
@@ -94,7 +96,7 @@ class VIModel:
         self.temp_tao_ss = np.zeros(self.K)
         self.temp_tao_b_ss = None
 
-        self.init_update()
+        self.init_update(data)
 
     def set_temp_zero(self):
 
@@ -103,13 +105,23 @@ class VIModel:
         self.temp_tao_ss.fill(0.0)
         self.temp_tao_b_ss = None
 
-    def init_update(self):
+    def init_update(self, x):
 
         self.var_theta = np.ones((self.T, self.K)) * (1 / self.K)
 
         for i in range(self.J):
+            N = x[i].shape[0]
+            self.rho = np.ones((N, self.T)) * (1 / self.T)
             self.temp_top_stick += np.sum(self.var_theta, 0)
+            self.temp_tao_ss += np.sum(self.rho.dot(self.var_theta), 0)
+            self.temp_xi_ss += self.var_theta.T.dot(self.rho.T.dot(x[i]))
+            if i == 0:
+                self.temp_tao_b_ss = self.rho.dot(self.var_theta)
+            else:
+                self.temp_tao_b_ss = np.vstack((self.temp_tao_b_ss, self.rho.dot(self.var_theta)))
         self.update_a_b()
+        self.update_mu()
+        self.update_tao(x)
 
     def calculate_new_com(self):
 
@@ -221,10 +233,11 @@ class VIModel:
             self.update_tao(x)
 
             print(ite)
+
             if ite == self.args.max_iter - 1:
                 # compute k
                 self.pi = np.exp(self.expect_log_sticks(self.a, self.b, self.K))
-                self.calculate_new_com()
+                # self.calculate_new_com()
                 if self.args.verbose:
                     print('mu: {}'.format(self.mean_mu))
                     # print('con: {}'.format(self.con))
@@ -246,7 +259,7 @@ class VIModel:
             self.mean_mu[t] = tao_t * self.cov_mu[t].dot(self.temp_xi_ss[t])
 
     def update_tao(self, x):
-        bound = self._bound_x(x.reshape((-1, self.D))).T
+        bound = self._bound_x(np.vstack((i for i in x))).T
         temp = np.sum(bound * self.temp_tao_b_ss, 0)
         for t in range(self.K):
             self.a_tao[t] = self.prior['u'] + .5 * self.D * self.temp_tao_ss[t]
@@ -276,7 +289,8 @@ class VIModel:
         likc = self.expect_log_sticks(self.a, self.b, self.K)
         likx = self._log_lik_x(bound_X)
         s = likc[:, np.newaxis] + likx
-        rho = np.exp(log_normalize(s)[0])
+        rho = np.exp(log_normalize(s.T)[0])
 
-        pred = np.argmax(rho, axis=0)
+        pred = np.argmax(rho, axis=1)
         return pred
+
