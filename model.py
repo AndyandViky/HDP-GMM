@@ -235,6 +235,9 @@ class VIModel:
             self.update_tao(x)
 
             # print(ite)
+            pi = np.exp(self.expect_log_sticks(self.a, self.b, self.K))
+            index = np.where(pi > self.args.mix_threshold)[0]
+            print("ite: {}, index: {}".format(ite, index))
 
             if ite == self.args.max_iter - 1:
                 # compute k

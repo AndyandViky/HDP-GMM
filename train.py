@@ -92,6 +92,7 @@ if __name__ == "__main__":
     trainer.train(datas)
     pred = trainer.model.predict(data)
     category = np.unique(np.array(pred))
+    print(category)
     console_log(pred, data=data, model_name='===========hdp-gmm', each_data=[data[pred == i] for i in category],
                 mu=trainer.model.mean_mu[category], newJ=trainer.model.newJ)
 

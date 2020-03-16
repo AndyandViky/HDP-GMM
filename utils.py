@@ -158,8 +158,9 @@ def get_data(data_dir, data_name):
     """
     datas = scio.loadmat('{}/{}.mat'.format(data_dir, data_name))
     time_ser = datas['data']
-    data = 2 ** time_ser
-    nor_data = data / np.sum(data, 1, keepdims=True)
+    data = time_ser
+    x_min, x_max = np.min(data, axis=1, keepdims=True), np.max(data, axis=1, keepdims=True)
+    nor_data = (data - x_min) / (x_max - x_min)
     # labels = datas['z'].reshape(-1)
     data = data / np.linalg.norm(data, axis=1, keepdims=True)
 
