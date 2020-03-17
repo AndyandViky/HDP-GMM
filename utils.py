@@ -167,6 +167,44 @@ def get_data(data_dir, data_name):
     return nor_data, data, time_ser
 
 
+def get_adhd_data(data_dir='./datas/brain', n_subjects=1):
+
+    dataset = datasets.fetch_adhd(data_dir=data_dir, n_subjects=n_subjects)
+    imgs = dataset.func
+
+    return imgs
+
+
+def get_haxby_data(data_dir='./datas/brain', subject_name='0_haxby', shuffle=True, data_split=100, random_seed=0):
+
+    np.random.seed(random_seed)
+    data = scio.loadmat('{}/{}.mat'.format(data_dir, subject_name))
+    labels = data['z'].reshape(-1)
+    data = data['data']
+
+    if shuffle:
+        # shuffle data
+        index = [i for i in range(data.shape[0])]
+        np.random.shuffle(index)
+        data = data[index]
+        labels = labels[index]
+
+    nor_test_data = data[:data_split]
+    test_data = nor_test_data / np.linalg.norm(nor_test_data, axis=1, keepdims=True)
+    test_data = test_data
+    test_labels = labels[:data_split]
+    labels = labels[data_split:]
+
+    nor_data = data[data_split:]
+    train_data = nor_data / np.linalg.norm(nor_data, axis=1, keepdims=True)
+    train_data = train_data
+
+    # scio.savemat('{}/{}_haxby_pro.mat'.format(data_dir, subject_num), {'data': nor_data, 'test_data': nor_test_data, 'labels': labels, 'test_labels': test_labels})
+
+    return train_data, test_data, nor_data, nor_test_data, labels, test_labels
+
+
+
 def plot_data(each_data, time, data_name=None, save=False):
     """
     plot different cluster graph

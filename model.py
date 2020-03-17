@@ -244,7 +244,7 @@ class VIModel:
                 self.pi = np.exp(self.expect_log_sticks(self.a, self.b, self.K))
                 self.calculate_new_com()
                 if self.args.verbose:
-                    print('mu: {}'.format(self.mean_mu))
+                    # print('mu: {}'.format(self.mean_mu))
                     # print('con: {}'.format(self.con))
                     print('pi: {}'.format(self.pi))
 
@@ -286,6 +286,7 @@ class VIModel:
 
         self.init_top_params(data)
         self.var_inf(data)
+        return self
 
     def predict(self, data):
         # predict
