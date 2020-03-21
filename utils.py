@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 from config import RESULT_DIR
 
+from nilearn import datasets
 from scipy.optimize import linear_sum_assignment as linear_assignment
 from scipy.special import iv
 from sklearn.metrics.cluster import normalized_mutual_info_score as NMI, \
