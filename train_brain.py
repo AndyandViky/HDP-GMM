@@ -72,8 +72,8 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--max_iter', dest='max_iter', help='max iteration of variational inference', default=100)
     args = parser.parse_args()
 
-    (K, T, mix_threshold, algorithm_category, max_iter, second_max_iter, threshold, group, dim, time, do_last_update,
-     random_seed) = DATA_PARAMS[args.data_name]
+    (K, T, mix_threshold, algorithm_category, max_iter, second_max_iter, threshold, group, dim, time, do_last_update
+     ) = DATA_PARAMS[args.data_name]
 
     # train_data, test_data, nor_data, nor_test_data, labels, test_labels = get_haxby_data(subject_name=args.data_name, data_split=100,
     #                                                                                      random_seed=random_seed)
@@ -116,16 +116,30 @@ if __name__ == "__main__":
     # print(ca)
     # console_log(pred=pred, labels=test_labels, model_name='-HDP-VMF-brain', newJ=model.newJ)
 
-    n_cluster = 40
-    func_filenames = get_adhd_data(data_dir='./datas/brain', n_subjects=30)
-    cp = ClusterProcess(model=VIModel(args), n_components=n_cluster, smoothing_fwhm=6.,
-                          memory="nilearn_cache", memory_level=2,
-                          threshold=3., verbose=10, random_state=0)
+    args.tau = 10
+    args.gamma = 1
+    args.u = 0.9
+    args.v = 0.01
+    args.zeta = 0.01
+    func_filenames = get_adhd_data(data_dir=BRAIN_DIR, n_subjects=30)
+    cp = ClusterProcess(model=VIModel(args), n_components=30, smoothing_fwhm=12.,
+                          memory="nilearn_cache", threshold=1., memory_level=2,
+                          verbose=10, random_state=0)
     cp.fit(func_filenames)
-    cp.plot(save=False, name='hdpgmm')
-    pred = cp.pred
-    # scio.savemat('./test_{}'.format(args.N * args.K), {'pred': pred})
     train_data = cp.train_data
-    ca = np.unique(pred)
-    print(ca)
-    console_log(pred=pred, data=np.vstack((i for i in train_data)), model_name='HMM-VMF-brain')
+    all_ch = 0
+    li = np.array([1, 3, 4, 6, 12, 13, 15, 19, 24, 29]) - 1
+    for i in li:
+        pred, container, pro = cp.model.predict_brain(train_data[i:i + 1])
+        # pro = scio.loadmat('./result/brain/vmf-py/pro{}.mat'.format(i+1))['pro']
+        # pred = np.argmax(pro, axis=1)
+
+        scio.savemat('./result/brain/hdp-gmm/pro{}.mat'.format(i + 1), {'pro': pro})
+        cp.plot_pro(pro.T, save=True, name='hdp-gmm', item_file='sub{}'.format(i + 1))
+        cp.plot_all(pred, save=True, name='hdp-gmm', item_file='sub{}'.format(i + 1))
+        ca = np.unique(pred)
+        print(ca)
+        print(i + 1)
+        measure_dict = console_log(pred=pred[:10000], data=train_data[i][:10000], model_name='HDP-VMF-brain')
+        all_ch += measure_dict['ch']
+    print(all_ch / 10)

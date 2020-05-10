@@ -10,6 +10,8 @@ try:
     import numpy as np
     import torch
 
+    izip = zip
+
     from scipy.special import digamma, iv, gammaln
     from sklearn.cluster import KMeans
     from numpy.matlib import repmat
@@ -57,6 +59,7 @@ class VIModel:
         self.temp_xi_ss = None
         self.temp_tao_ss = None
         self.temp_tao_b_ss = None
+        self.temp_tao_sss = None
 
         self.det = 1e-10
 
@@ -64,7 +67,7 @@ class VIModel:
         N, D = X.shape
         bound_x = np.empty((self.newJ, N))
         for t in range(self.newJ):
-            bound_x[t] = np.sum((X - self.mean_mu[t])**2, axis = 1) + np.trace(self.cov_mu[t])
+            bound_x[t] = np.sum((X - self.mean_mu[t])**2, axis=1) + np.trace(self.cov_mu[t])
         return bound_x
 
     def init_top_params(self, data):
@@ -89,11 +92,12 @@ class VIModel:
             'gamma': self.args.gamma,
         }
 
-        self.a = np.ones(self.K - 1)
-        self.b = np.ones(self.K - 1)
+        self.a = np.ones(self.K)
+        self.b = np.ones(self.K)
         self.temp_top_stick = np.zeros(self.K)
         self.temp_xi_ss = np.zeros((self.K, self.D))
         self.temp_tao_ss = np.zeros(self.K)
+        self.temp_tao_sss = np.zeros(self.K)
         self.temp_tao_b_ss = None
 
         self.init_update(data)
@@ -103,6 +107,7 @@ class VIModel:
         self.temp_top_stick.fill(0.0)
         self.temp_xi_ss.fill(0.0)
         self.temp_tao_ss.fill(0.0)
+        self.temp_tao_sss.fill(0.0)
         self.temp_tao_b_ss = None
 
     def init_update(self, x):
@@ -121,7 +126,7 @@ class VIModel:
                 self.temp_tao_b_ss = np.vstack((self.temp_tao_b_ss, self.rho.dot(self.var_theta)))
         self.update_a_b()
         self.update_mu()
-        self.update_tao(x)
+        self.update_tao()
 
     def calculate_new_com(self):
 
@@ -143,31 +148,34 @@ class VIModel:
 
         self.rho = np.ones((N, self.T)) * (1 / self.T)
 
-        self.g = np.zeros(self.T - 1)
-        self.h = np.zeros(self.T - 1)
+        self.g = np.zeros(self.T)
+        self.h = np.zeros(self.T)
 
         self.update_g_h(self.rho)
 
     def expect_log_sticks(self, a, b, k):
 
-        sticks = np.zeros((2, k - 1))
-        sticks[0] = a
-        sticks[1] = b
-        dig_sum = digamma(np.sum(sticks, 0))
-        ElogW = digamma(sticks[0]) - dig_sum
-        Elog1_W = digamma(sticks[1]) - dig_sum
-
-        n = len(sticks[0]) + 1
-        Elogsticks = np.zeros(n)
-        Elogsticks[0:n - 1] = ElogW
-        Elogsticks[1:] = Elogsticks[1:] + np.cumsum(Elog1_W)
-        return Elogsticks
+        # sticks = np.zeros((2, k - 1))
+        # sticks[0] = a
+        # sticks[1] = b
+        # dig_sum = digamma(np.sum(sticks, 0))
+        # ElogW = digamma(sticks[0]) - dig_sum
+        # Elog1_W = digamma(sticks[1]) - dig_sum
+        #
+        # n = len(sticks[0]) + 1
+        # Elogsticks = np.zeros(n)
+        # Elogsticks[0:n - 1] = ElogW
+        # Elogsticks[1:] = Elogsticks[1:] + np.cumsum(Elog1_W)
+        # return Elogsticks
+        E_log_1_pi = np.roll(np.cumsum(digamma(b) - digamma(a + b)), 1)
+        E_log_1_pi[0] = 0
+        return digamma(a) - digamma(a + b) + E_log_1_pi
 
     def var_inf_2d(self, x, Elogsticks_1nd, j):
 
         Elog_phi = self._log_lik_x(self._bound_x(x)).T
 
-        second_max_iter = 20000 if self.second_max_iter == -1 else self.second_max_iter
+        second_max_iter = 5000 if self.second_max_iter == -1 else self.second_max_iter
         self.init_second_params(x.shape[0])
         likelihood = 0.0
         old_likelihood = 1
@@ -230,9 +238,12 @@ class VIModel:
             for i in range(self.J):
                 self.var_inf_2d(x[i], Elogsticks_1nd, i)
 
+            bound = self._bound_x(np.vstack((i for i in x))).T
+            self.temp_tao_sss = np.sum(bound * self.temp_tao_b_ss, 0)
+            self.optimal_ordering()
             self.update_a_b()
             self.update_mu()
-            self.update_tao(x)
+            self.update_tao()
 
             # print(ite)
             pi = np.exp(self.expect_log_sticks(self.a, self.b, self.K))
@@ -247,6 +258,16 @@ class VIModel:
                     # print('mu: {}'.format(self.mean_mu))
                     # print('con: {}'.format(self.con))
                     print('pi: {}'.format(self.pi))
+
+    def optimal_ordering(self):
+
+        s = [(a, b) for (a, b) in izip(self.temp_top_stick, range(self.K))]
+        x = sorted(s, key=lambda y: y[0], reverse=True)
+        idx = [y[1] for y in x]
+        self.temp_top_stick[:] = self.temp_top_stick[idx]
+        self.temp_tao_ss[:] = self.temp_tao_ss[idx]
+        self.temp_xi_ss[:] = self.temp_xi_ss[idx]
+        self.temp_tao_sss[:] = self.temp_tao_sss[idx]
 
     def _log_lik_x(self, bound_X):
         likx = np.zeros(bound_X.shape)
@@ -263,24 +284,40 @@ class VIModel:
             self.cov_mu[t] = np.linalg.inv((tao_t * Nt + 1) * np.eye(self.D))
             self.mean_mu[t] = tao_t * self.cov_mu[t].dot(self.temp_xi_ss[t])
 
-    def update_tao(self, x):
-        bound = self._bound_x(np.vstack((i for i in x))).T
-        temp = np.sum(bound * self.temp_tao_b_ss, 0)
+    def update_tao(self):
+
         for t in range(self.K):
             self.a_tao[t] = self.prior['u'] + .5 * self.D * self.temp_tao_ss[t]
-            self.b_tao[t] = self.prior['v'] + .5 * temp[t]
+            self.b_tao[t] = self.prior['v'] + .5 * self.temp_tao_sss[t]
 
     def update_g_h(self, rho):
         # compute g, h
-        self.g = 1 + np.sum(rho[:, :self.T - 1], 0)
-        phi_cum = np.flipud(np.sum(rho[:, 1:], 0))
-        self.h = self.prior['gamma'] + np.flipud(np.cumsum(phi_cum))
+        # self.g = 1 + np.sum(rho[:, :self.T - 1], 0)
+        # phi_cum = np.flipud(np.sum(rho[:, 1:], 0))
+        # self.h = self.prior['gamma'] + np.flipud(np.cumsum(phi_cum))
+
+        N_k = np.sum(rho, 0)
+        self.g = 1 + N_k
+        for i in range(self.T):
+            if i == self.T - 1:
+                self.h[i] = self.prior['gamma']
+            else:
+                temp = rho[:, i + 1:self.T]
+                self.h[i] = self.prior['gamma'] + np.sum(np.sum(temp, 1), 0)
 
     def update_a_b(self):
         # compute a, b
-        self.a = 1 + self.temp_top_stick[:self.K - 1]
-        var_phi_sum = np.flipud(self.temp_top_stick[1:])
-        self.b = self.prior['tau'] + np.flipud(np.cumsum(var_phi_sum))
+        # self.a = 1 + self.temp_top_stick[:self.K - 1]
+        # var_phi_sum = np.flipud(self.temp_top_stick[1:])
+        # self.b = self.prior['tau'] + np.flipud(np.cumsum(var_phi_sum))
+
+        self.a = 1 + self.temp_top_stick
+        for i in range(self.K):
+            if i == self.K - 1:
+                self.b[i] = self.prior['tau']
+            else:
+                temp = self.temp_top_stick[i + 1:self.K]
+                self.b[i] = self.prior['tau'] + np.sum(temp)
 
     def fit(self, data):
 
@@ -299,4 +336,15 @@ class VIModel:
 
         pred = np.argmax(rho, axis=1)
         return pred
+
+    def predict_brain(self, data):
+        # predict
+        data = np.vstack((i for i in data))
+        bound_X = self._bound_x(data)
+        likc = np.log(self.pi)
+        likx = self._log_lik_x(bound_X)
+        s = likc[:, np.newaxis] + likx
+        pro = np.exp(log_normalize(s.T)[0])
+        pred = np.argmax(pro, axis=1)
+        return pred, None, pro
 

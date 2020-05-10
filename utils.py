@@ -98,6 +98,7 @@ def console_log(pred, data=None, labels=None, model_name='cluster', each_data=No
     for (key, value) in measure_dict.items():
         char += '{}: {:.4f} '.format(key, value)
     print('{} {}'.format(model_name, char))
+    return measure_dict
 
 
 def compute_h_ave(data, mu, N):

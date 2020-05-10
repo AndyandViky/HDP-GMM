@@ -23,9 +23,9 @@ RESULT_DIR = os.path.join(REPO_DIR, 'result')
 # difference datasets config
 # K, T, mix_threshold, algorithm_category, max_iter, second_max_iter, threshold, group, dim, times
 DATA_PARAMS = {
-    'Sporulation': (56, 15, 0.02, 0, 22, -1, 1e-7, 50, 7, (0, 5, 15, 20, 25, 30, 35)),
-    'yeast': (55, 15, 0.02, 0, 30, -1, 1e-7, 50, 7, (0, 9.5, 11.5, 13.5, 15.5, 18.5, 20.5)),
-    'Human_Fibroblasts': (30, 10, 0.02, 0, 11, -1, 1e-7, 50, 18, [i*10 for i in range(18)]),
+    'Sporulation': (56, 15, 0.01, 0, 22, -1, 1e-7, 50, 7, (0, 5, 15, 20, 25, 30, 35)),
+    'yeast': (55, 15, 0.01, 0, 30, -1, 1e-7, 50, 7, (0, 9.5, 11.5, 13.5, 15.5, 18.5, 20.5)),
+    'Human_Fibroblasts': (30, 10, 0.01, 0, 11, -1, 1e-7, 50, 18, [i*10 for i in range(18)]),
     'Spellman': (30, 10, 0.02, 0, 20, -1, 1e-7, 40, 18, [i*10 for i in range(18)]),
 
     # brain dataset has a additional parameter which is a random seed. / show the best score.
@@ -36,5 +36,5 @@ DATA_PARAMS = {
     '4_haxby': (150, 15, 0.01, 0, 95, -1, 1e-7, 4, 48, (), 1, 3),
     '5_haxby': (150, 15, 0.01, 0, 35, -1, 1e-7, 4, 48, (), 1, 3),
 
-    'adhd': (40, 40, 0.01, 0, 5, 500, 1e-7, 50, 20, (), 1, 0),
+    'adhd': (150, 70, 0.01, 0, 10, 100, 1e-4, 30, 40, (), 1),
 }

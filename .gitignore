@@ -3,3 +3,4 @@
 __pycache__/
 datas/
 nilearn_cache/
+result/
